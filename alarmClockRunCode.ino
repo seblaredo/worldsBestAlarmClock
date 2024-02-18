@@ -1,3 +1,4 @@
+#include <LiquidCrystal.h>
 #include <PulseSensorPlayground.h>
 #include "Grove_Temperature_And_Humidity_Sensor.h"
 #include "SevSeg.h"
@@ -13,15 +14,20 @@ bool volumeIsHighest = false;
 const int buttonPin = 2;
 int buttonState = 0;
 const int pinAdc = A0;
-int currentHour = 3;
-int currentMinute = 6;
+int currentHour = 8;
+int currentMinute = 37;
 int currentSeconds = 40 + 15;
 int currentTimeInms = 0;
-int alarmHour = 3;
-int alarmMinute = 7;
+int alarmHour = 8;
+int alarmMinute = 38;
+int uHour;
+int uMinute;
 bool hasRun = false;
 int tempRead;
 int universalBPM = 0;
+bool alarmSounding = false;
+
+LiquidCrystal lcd(38, 40, 47, 49, 51, 53);
 
 const int PulseWire = 7;
 const int LED = LED_BUILTIN;
@@ -61,6 +67,10 @@ void setup() {
   sevseg.begin(COMMON_CATHODE, numDigits, digitPins, segmentPins,
                resistorsOnSegments);
   sevseg.setBrightness(60);
+
+  lcd.begin(16, 2);
+  lcd.setCursor(0, 0);
+  lcd.print("Zzz...");
 }
 
 float getTemp() {
@@ -105,11 +115,32 @@ void loop() {
     int number = debug.parseInt();
     debug.println("You entered: ");
     debug.println(number);
+    if (alarmSounding) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+    }
     int volume = readSound();
-    if ((int)number == (int)tempRead && universalBPM > 60 && volume > 900) {
-      digitalWrite(buzzerPin, LOW);
-    } else {
-      number = -200;
+    if (alarmSounding) {
+      if ((int)number == (int)tempRead && universalBPM > 60 && volume > 900) {
+        digitalWrite(buzzerPin, LOW);
+        lcd.setCursor(0, 0);
+        lcd.print("Good Morning!");
+        alarmSounding = false;
+      } else {
+        if (number != tempRead && number != 0) {
+          lcd.print("Wrong Temp!");
+        } else {
+          if (universalBPM <= 60) {
+            lcd.setCursor(0, 0);
+            lcd.print("Too Sleepy!");
+          }
+          if (volume <= 900) {
+            lcd.setCursor(0, 1);
+            lcd.print("Louder!");
+          }
+        }
+        number = -200;
+      }
     }
   }
   currentTimeInms = (currentHour * 3600 * 1000) + (currentMinute * 60 * 1000) +
@@ -117,6 +148,8 @@ void loop() {
   unsigned long currentMillis = millis() + currentTimeInms;
   int hour = (currentMillis / 1000 / 3600) % 24;
   int minute = ((currentMillis / 1000) / 60) % 60;
+  uHour = hour;
+  uMinute = minute;
   int digit1 = hour / 10;
   int digit2 = hour % 10;
   int digit3 = minute / 10;
@@ -133,6 +166,11 @@ void loop() {
   if (hour == alarmHour && minute == alarmMinute) {
     if (!hasRun) {
       digitalWrite(buzzerPin, HIGH);
+      alarmSounding = true;
+      lcd.clear();
+      lcd.print("Time to wake up!");
+      lcd.setCursor(0, 1);
+      lcd.print("Whats room temp?");
       tempRead = getTemp();
     }
   }
